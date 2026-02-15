@@ -13,8 +13,10 @@
   "dependencies": {
     "@fastify/jwt": "^10.0.0",
     "@prisma/client": "^5.22.0",
+    "bullmq": "^5.69.2",
     "dotenv": "^17.3.1",
     "fastify": "^5.7.4",
+    "ioredis": "^5.9.3",
     "zod": "^4.3.6"
   },
   "devDependencies": {

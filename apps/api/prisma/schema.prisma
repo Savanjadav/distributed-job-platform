@@ -1,0 +1,44 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id            String   @id @default(uuid())
+  email         String   @unique
+  passwordHash  String
+  role          String
+  createdAt     DateTime @default(now())
+}
+
+model Job {
+  id               String   @id @default(uuid())
+  type             String
+  payload          Json
+  status           String
+  priority         String
+  maxAttempts      Int
+  attemptsMade     Int      @default(0)
+  idempotencyKey   String?
+  cancelRequested  Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  runs             JobRun[]
+}
+
+model JobRun {
+  id         String   @id @default(uuid())
+  jobId      String
+  attempt    Int
+  status     String
+  workerId   String?
+  errorMsg   String?
+  startedAt  DateTime?
+  finishedAt DateTime?
+
+  job        Job @relation(fields: [jobId], references: [id])
+}

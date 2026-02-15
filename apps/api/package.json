@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "tsx watch src/server.ts"
   },
   "keywords": [],
   "author": "",
@@ -12,13 +12,14 @@
   "packageManager": "pnpm@10.29.3",
   "dependencies": {
     "@fastify/jwt": "^10.0.0",
-    "@prisma/client": "^7.4.0",
+    "@prisma/client": "^5.22.0",
+    "dotenv": "^17.3.1",
     "fastify": "^5.7.4",
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "prisma": "^7.4.0",
-    "ts-node-dev": "^2.0.0",
+    "prisma": "^5.22.0",
+    "tsx": "^4.21.0",
     "typescript": "^5.9.3"
   }
 }

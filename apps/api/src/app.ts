@@ -1,19 +1,17 @@
 import Fastify from "fastify";
 import { PrismaClient } from "@prisma/client";
-import { jobQueue } from "./queue";
 import { randomUUID } from "crypto";
+import { jobQueue } from "./queue";
 
 export function buildApp() {
   const app = Fastify({ logger: true });
   const prisma = new PrismaClient();
 
-  // HEALTH ROUTE
   app.get("/health", async () => {
     await prisma.$queryRaw`SELECT 1`;
     return { status: "ok" };
   });
 
-  // JOB CREATE ROUTE
   app.post("/jobs", async (request, reply) => {
     const jobId = randomUUID();
     const payload = request.body as any;
@@ -21,7 +19,7 @@ export function buildApp() {
     await prisma.job.create({
       data: {
         id: jobId,
-        type: payload.task || "generic",
+        type: payload.task || "default",
         payload,
         status: "QUEUED",
         priority: "NORMAL",
@@ -30,7 +28,17 @@ export function buildApp() {
       },
     });
 
-    await jobQueue.add("process-job", { jobId });
+    await jobQueue.add(
+      "job",
+      { jobId },
+      {
+        attempts: 3,
+        backoff: {
+          type: "exponential",
+          delay: 1000,
+        },
+      }
+    );
 
     return { jobId };
   });

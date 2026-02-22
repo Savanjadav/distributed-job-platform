@@ -18,6 +18,14 @@ const worker = new Worker(
       throw new Error("Job not found in DB");
     }
 
+    if (dbJob.cancelRequested) {
+      await prisma.job.update({
+        where: { id: jobId },
+        data: { status: "CANCELLED" },
+      });
+      return;
+    }
+
     // Update status
     await prisma.job.update({
       where: { id: jobId },
@@ -44,7 +52,7 @@ const worker = new Worker(
 
     console.log("Completed job:", jobId);
   },
-  
+
   {
     connection: {
       host: "localhost",

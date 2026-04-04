@@ -3,12 +3,14 @@ import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
+const WORKER_NAME = `worker-${process.pid}`;
+
 const worker = new Worker(
   "jobs",
   async (job) => {
     const { jobId } = job.data;
 
-    console.log("Processing job:", jobId);
+    console.log(`[${WORKER_NAME}] Processing job: ${jobId}`);
 
     const dbJob = await prisma.job.findUnique({
       where: { id: jobId },
@@ -40,8 +42,8 @@ const worker = new Worker(
       throw new Error("Simulated failure");
     }
 
-    // Simulate work
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    const delayMs = (dbJob.payload as any)?.delayMs ?? 2000;
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
 
     await prisma.job.update({
       where: { id: jobId },
@@ -50,7 +52,7 @@ const worker = new Worker(
       },
     });
 
-    console.log("Completed job:", jobId);
+    console.log(`[${WORKER_NAME}] Completed job: ${jobId}`);
   },
 
   {
@@ -58,17 +60,17 @@ const worker = new Worker(
       host: "localhost",
       port: 6379,
     },
+    concurrency: 5
   }
 );
 
-console.log("Worker started...");
 
 worker.on("failed", async (job, err) => {
   if (!job) return;
 
   const { jobId } = job.data;
 
-  console.log("Job failed:", jobId);
+  console.log(`[${WORKER_NAME}] Job failed: ${jobId}`);
 
   const dbJob = await prisma.job.findUnique({
     where: { id: jobId },
@@ -76,22 +78,36 @@ worker.on("failed", async (job, err) => {
 
   if (!dbJob) return;
 
-  if (dbJob.attemptsMade >= dbJob.maxAttempts) {
+  const maxAttempts = job.opts.attempts ?? 1;
+  const attemptsMade = job.attemptsMade;
+
+  if (attemptsMade >= maxAttempts) {
     await prisma.job.update({
       where: { id: jobId },
       data: {
         status: "DEAD_LETTER",
+        attemptsMade: attemptsMade,
       },
     });
 
-    console.log("Moved to dead letter:", jobId);
+    console.log(`[${WORKER_NAME}] Job ${jobId} moved to DEAD_LETTER`);
   } else {
     await prisma.job.update({
       where: { id: jobId },
       data: {
         status: "FAILED",
+        attemptsMade: attemptsMade,
       },
     });
+
+    console.log(`[${WORKER_NAME}] Job ${jobId} marked FAILED and will retry`);
   }
 });
+
+worker.on("completed", (job) => {
+  console.log(`Worker completed BullMQ job ${job.id}`);
+});
+
+console.log(`[${WORKER_NAME}] Worker started with concurrency = 5`);
+
 

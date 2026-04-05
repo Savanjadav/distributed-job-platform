@@ -7,28 +7,38 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum Role {
+  USER
+  ADMIN
+}
+
 model User {
-  id            String   @id @default(uuid())
-  email         String   @unique
-  passwordHash  String
-  role          String
-  createdAt     DateTime @default(now())
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  role         Role     @default(USER)
+  createdAt    DateTime @default(now())
+
+  jobs         Job[]
 }
 
 model Job {
-  id               String   @id @default(uuid())
-  type             String
-  payload          Json
-  status           String
-  priority         String
-  maxAttempts      Int
-  attemptsMade     Int      @default(0)
-  idempotencyKey   String?
-  cancelRequested  Boolean  @default(false)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  id              String   @id @default(uuid())
+  type            String
+  payload         Json
+  status          String
+  priority        String
+  maxAttempts     Int
+  attemptsMade    Int      @default(0)
+  idempotencyKey  String?
+  cancelRequested Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
-  runs             JobRun[]
+  userId          String
+  user            User     @relation(fields: [userId], references: [id])
+
+  runs            JobRun[]
 }
 
 model JobRun {
@@ -41,5 +51,5 @@ model JobRun {
   startedAt  DateTime?
   finishedAt DateTime?
 
-  job        Job @relation(fields: [jobId], references: [id])
+  job        Job      @relation(fields: [jobId], references: [id])
 }

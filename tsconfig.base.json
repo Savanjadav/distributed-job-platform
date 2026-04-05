@@ -6,7 +6,6 @@
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "baseUrl": ".",
     "paths": {
       "@shared/*": ["packages/shared/src/*"]
     }

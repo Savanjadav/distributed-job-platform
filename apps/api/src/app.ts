@@ -16,7 +16,7 @@ export function buildApp() {
   const prisma = new PrismaClient();
 
   app.register(jwt, {
-    secret: "supersecretkey",
+    secret: process.env.JWT_SECRET || "supersecretkey",
   });
 
   const authenticate = async (request: any, reply: any) => {

@@ -4,7 +4,9 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "dev": "tsx watch src/server.ts"
+    "dev": "tsx watch src/server.ts",
+    "test": "jest --runInBand",
+    "test:watch": "jest --watch"
   },
   "keywords": [],
   "author": "",
@@ -22,7 +24,12 @@
   },
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",
+    "@types/jest": "^30.0.0",
+    "@types/supertest": "^7.2.0",
+    "jest": "^30.3.0",
     "prisma": "^5.22.0",
+    "supertest": "^7.2.2",
+    "ts-jest": "^29.4.9",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"
   }

@@ -44,29 +44,18 @@ jobs:
       JWT_SECRET: supersecretkey
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10
+      - uses: pnpm/action-setup@v4   # ✅ FIXED
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22           # ✅ UPDATED
           cache: "pnpm"
 
-      - name: Install dependencies
-        run: pnpm install --no-frozen-lockfile
+      - run: pnpm install --no-frozen-lockfile
         working-directory: ../../
 
-      - name: Generate Prisma client
-        run: npx prisma generate
-
-      - name: Run Prisma migrations
-        run: npx prisma migrate deploy
-
-      - name: Run tests
-        run: pnpm test
+      - run: npx prisma generate
+      - run: npx prisma migrate deploy
+      - run: pnpm test

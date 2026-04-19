@@ -1,6 +1,7 @@
 import request from "supertest";
 import { PrismaClient } from "@prisma/client";
 import { buildApp } from "../src/app";
+import { jobQueue } from "../src/queue";
 
 const prisma = new PrismaClient();
 
@@ -13,10 +14,6 @@ describe("API integration tests", () => {
 
   beforeAll(async () => {
     await app.ready();
-  });
-
-  beforeAll(async () => {
-    await app.ready();
 
     // clean DB once before tests start
     await prisma.job.deleteMany();
@@ -24,8 +21,9 @@ describe("API integration tests", () => {
   });
 
   afterAll(async () => {
-    await prisma.$disconnect();
-    await app.close();
+    await app.close();          // close Fastify
+    await prisma.$disconnect(); // close DB
+    await jobQueue.close();     // 🔥 close Redis (VERY IMPORTANT)
   });
 
   it("should return health status", async () => {

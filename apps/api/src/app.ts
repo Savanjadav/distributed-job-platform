@@ -4,6 +4,8 @@ import Fastify from "fastify";
 import { PrismaClient } from "@prisma/client";
 import { randomUUID } from "crypto";
 import { jobQueue } from "./queue";
+import { register, jobsCreatedCounter, jobQueueGauge } from "./metrics";
+
 
 type AuthUser = {
   userId: string;
@@ -208,6 +210,8 @@ export function buildApp() {
         },
       }
     );
+    jobsCreatedCounter.inc();
+
 
     return { jobId };
   });
@@ -232,6 +236,17 @@ export function buildApp() {
       completed,
       dead,
     };
+  });
+
+  app.get("/prometheus", async (request, reply) => {
+    const queued = await prisma.job.count({
+      where: { status: "QUEUED" },
+    });
+
+    jobQueueGauge.set(queued);
+
+    reply.header("Content-Type", register.contentType);
+    return register.metrics();
   });
 
   return app;

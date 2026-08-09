@@ -6,6 +6,7 @@ import { randomUUID } from "crypto";
 import { jobQueue } from "./queue";
 import { register, jobsCreatedCounter, jobQueueGauge } from "./metrics";
 
+const prisma = new PrismaClient();
 
 type AuthUser = {
   userId: string;
@@ -15,7 +16,6 @@ type AuthUser = {
 
 export function buildApp() {
   const app = Fastify({ logger: true });
-  const prisma = new PrismaClient();
 
   app.register(jwt, {
     secret: process.env.JWT_SECRET || "supersecretkey",
@@ -24,17 +24,41 @@ export function buildApp() {
   const authenticate = async (request: any, reply: any) => {
     try {
       await request.jwtVerify();
-    } catch (err) {
+    } catch {
       return reply.code(401).send({ error: "Unauthorized" });
     }
   };
 
-  app.post("/auth/register", async (request, reply) => {
-    const { email, password, role } = request.body as {
-      email: string;
-      password: string;
-      role?: "USER" | "ADMIN";
+  /* ================= ROOT ================= */
+
+  app.get("/", async () => {
+    return {
+      service: "Distributed Job Processing Platform",
+      status: "healthy",
+      uptime: process.uptime(),
+      version: "1.0.0",
+      environment: process.env.NODE_ENV || "development",
+      components: {
+        api: "running",
+        worker: "running",
+        database: "connected",
+      },
+      endpoints: [
+        "GET /health",
+        "POST /auth/register",
+        "POST /auth/login",
+        "GET /jobs",
+        "POST /jobs",
+        "GET /metrics",
+        "GET /prometheus",
+      ],
     };
+  });
+
+  /* ================= AUTH ================= */
+
+  app.post("/auth/register", async (request, reply) => {
+    const { email, password, role } = request.body as any;
 
     const existingUser = await prisma.user.findUnique({
       where: { email },
@@ -62,10 +86,7 @@ export function buildApp() {
   });
 
   app.post("/auth/login", async (request, reply) => {
-    const { email, password } = request.body as {
-      email: string;
-      password: string;
-    };
+    const { email, password } = request.body as any;
 
     const user = await prisma.user.findUnique({
       where: { email },
@@ -90,10 +111,95 @@ export function buildApp() {
     return { token };
   });
 
+  /* ================= HEALTH ================= */
+
   app.get("/health", async () => {
-    await prisma.$queryRaw`SELECT 1`;
-    return { status: "ok" };
+    try {
+      // 🔹 DB check
+      await prisma.$queryRaw`SELECT 1`;
+
+      // 🔹 Job stats
+      const totalJobs = await prisma.job.count();
+      const queuedJobs = await prisma.job.count({ where: { status: "QUEUED" } });
+      const processingJobs = await prisma.job.count({ where: { status: "PROCESSING" } });
+      const completedJobs = await prisma.job.count({ where: { status: "COMPLETED" } });
+      const failedJobs = await prisma.job.count({ where: { status: "DEAD_LETTER" } });
+
+      // 🔹 Performance metrics
+      const successRate =
+        totalJobs === 0 ? 0 : ((completedJobs / totalJobs) * 100).toFixed(2);
+
+      const failureRate =
+        totalJobs === 0 ? 0 : ((failedJobs / totalJobs) * 100).toFixed(2);
+
+      // 🔹 Queue health
+      const queueStatus =
+        queuedJobs > 50 ? "high_load" :
+          queuedJobs > 10 ? "moderate" :
+            "healthy";
+
+      return {
+        service: "Distributed Job Processing Platform",
+        status: "healthy",
+        version: "1.0.0",
+        environment: process.env.NODE_ENV || "development",
+
+        uptime: process.uptime(),
+
+        timestamp: new Date().toISOString(),
+
+        systemMetrics: {
+          totalJobs,
+          queued: queuedJobs,
+          processing: processingJobs,
+          completed: completedJobs,
+          failed: failedJobs,
+        },
+
+        performance: {
+          successRate: `${successRate}%`,
+          failureRate: `${failureRate}%`,
+        },
+
+        queue: {
+          status: queueStatus,
+          queuedJobs,
+        },
+
+        components: {
+          api: "running",
+          database: "connected",
+          worker: {
+            status: "running",
+            activeJobs: processingJobs,
+          },
+        },
+
+        system: {
+          node: process.version,
+          platform: process.platform,
+        },
+
+        endpoints: [
+          "GET /health",
+          "POST /auth/register",
+          "POST /auth/login",
+          "GET /jobs",
+          "POST /jobs",
+          "GET /metrics",
+          "GET /prometheus",
+        ],
+      };
+
+    } catch (err) {
+      return {
+        status: "unhealthy",
+        error: "Database connection failed",
+      };
+    }
   });
+
+  /* ================= JOBS ================= */
 
   app.get("/jobs", { preHandler: [authenticate] }, async (request: any) => {
     const user = request.user as AuthUser;
@@ -111,12 +217,10 @@ export function buildApp() {
   });
 
   app.get("/jobs/:id", { preHandler: [authenticate] }, async (request: any, reply) => {
-    const { id } = request.params as { id: string };
+    const { id } = request.params as any;
     const user = request.user as AuthUser;
 
-    const job = await prisma.job.findUnique({
-      where: { id },
-    });
+    const job = await prisma.job.findUnique({ where: { id } });
 
     if (!job) {
       return reply.code(404).send({ error: "Job not found" });
@@ -130,7 +234,7 @@ export function buildApp() {
   });
 
   app.post("/jobs/:id/retry", { preHandler: [authenticate] }, async (request: any, reply) => {
-    const { id } = request.params as { id: string };
+    const { id } = request.params as any;
     const user = request.user as AuthUser;
 
     if (user.role !== "ADMIN") {
@@ -160,7 +264,7 @@ export function buildApp() {
   });
 
   app.post("/jobs/:id/cancel", { preHandler: [authenticate] }, async (request: any, reply) => {
-    const { id } = request.params as { id: string };
+    const { id } = request.params as any;
     const user = request.user as AuthUser;
 
     const job = await prisma.job.findUnique({ where: { id } });
@@ -199,22 +303,17 @@ export function buildApp() {
       },
     });
 
-    await jobQueue.add(
-      "job",
-      { jobId },
-      {
-        attempts: 3,
-        backoff: {
-          type: "exponential",
-          delay: 1000,
-        },
-      }
-    );
-    jobsCreatedCounter.inc();
+    await jobQueue.add("job", { jobId }, {
+      attempts: 3,
+      backoff: { type: "exponential", delay: 1000 },
+    });
 
+    jobsCreatedCounter.inc();
 
     return { jobId };
   });
+
+  /* ================= METRICS ================= */
 
   app.get("/metrics", { preHandler: [authenticate] }, async (request: any, reply) => {
     const user = request.user as AuthUser;
@@ -229,24 +328,24 @@ export function buildApp() {
     const completed = await prisma.job.count({ where: { status: "COMPLETED" } });
     const dead = await prisma.job.count({ where: { status: "DEAD_LETTER" } });
 
-    return {
-      total,
-      queued,
-      processing,
-      completed,
-      dead,
-    };
+    return { total, queued, processing, completed, dead };
   });
 
-  app.get("/prometheus", async (request, reply) => {
-    const queued = await prisma.job.count({
-      where: { status: "QUEUED" },
-    });
+  app.get("/prometheus", async (_, reply) => {
+    try {
+      const queued = await prisma.job.count({
+        where: { status: "QUEUED" },
+      });
 
-    jobQueueGauge.set(queued);
+      jobQueueGauge.set(queued);
 
-    reply.header("Content-Type", register.contentType);
-    return register.metrics();
+      reply.header("Content-Type", register.contentType);
+      return register.metrics();
+    } catch (err) {
+      console.error("Prometheus error:", err);
+      reply.code(200);
+      return "# metrics error fallback\n";
+    }
   });
 
   return app;

@@ -24,10 +24,12 @@ services:
   prometheus:
     image: prom/prometheus
     container_name: djp-prometheus
+    restart: always
     ports:
       - "9090:9090"
     volumes:
       - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
     depends_on:
       - redis
       - postgres
@@ -35,10 +37,18 @@ services:
   grafana:
     image: grafana/grafana
     container_name: djp-grafana
+    restart: always
     ports:
       - "3001:3000"
+    environment:
+      GF_SERVER_ROOT_URL: "http://localhost:3001"
+      GF_SERVER_DOMAIN: "localhost"
+    volumes:
+      - grafana_storage:/var/lib/grafana
     depends_on:
       - prometheus
 
 volumes:
   postgres_data:
+  grafana_storage:
+  prometheus_data: 

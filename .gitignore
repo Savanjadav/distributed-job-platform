@@ -1,4 +1,46 @@
-node_modules
-dist
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+dist/
+build/
+coverage/
+
+# Environment variables / secrets
 .env
+.env.*
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS files
 .DS_Store
+Thumbs.db
+
+# IDE / editors
+.vscode/
+.idea/
+
+# TypeScript
+*.tsbuildinfo
+
+# Testing
+coverage/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Docker local overrides
+docker-compose.override.yml
+
+# Prisma local database (if SQLite is ever used)
+*.db
+*.db-journal

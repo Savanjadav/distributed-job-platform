@@ -1,0 +1,56 @@
+groups:
+  - name: job-system-alerts
+    rules:
+
+      # 🚨 High Failure Rate
+      - alert: HighFailureRate
+        expr: |
+          rate(worker_jobs_dead_letter_total[5m]) 
+          / 
+          (rate(worker_jobs_completed_total[5m]) + rate(worker_jobs_dead_letter_total[5m])) > 0.3
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High failure rate detected"
+          description: "Failure rate > 30% for last 5 minutes"
+
+      # 🚨 Too Many Dead Letters
+      - alert: DeadLetterSpike
+        expr: increase(worker_jobs_dead_letter_total[5m]) > 5
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Dead letter spike"
+          description: "More than 5 jobs failed permanently in 5 minutes"
+
+      # 🚨 Queue Backlog
+      - alert: QueueBacklog
+        expr: jobs_queue_total > 50
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Queue backlog is high"
+          description: "Too many jobs waiting in queue"
+
+      # 🚨 Worker Down
+      - alert: WorkerDown
+        expr: up{job="worker"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Worker is down"
+          description: "Worker service is not responding"
+
+      # 🚨 API Down
+      - alert: ApiDown
+        expr: up{job="api"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "API is down"
+          description: "API service is not responding"

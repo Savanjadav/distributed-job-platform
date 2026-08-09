@@ -15,22 +15,65 @@ describe("API integration tests", () => {
   beforeAll(async () => {
     await app.ready();
 
-    // clean DB once before tests start
+    // Clean DB once before tests start
     await prisma.job.deleteMany();
     await prisma.user.deleteMany();
   });
 
   afterAll(async () => {
-    await app.close();          // close Fastify
-    await prisma.$disconnect(); // close DB
-    await jobQueue.close();     // 🔥 close Redis (VERY IMPORTANT)
+    await app.close();
+    await prisma.$disconnect();
+    await jobQueue.close();
   });
 
   it("should return health status", async () => {
     const res = await request(app.server).get("/health");
 
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ status: "ok" });
+
+    expect(res.body).toMatchObject({
+      service: "Distributed Job Processing Platform",
+      status: "healthy",
+      version: "1.0.0",
+      environment: "test",
+
+      components: {
+        api: "running",
+        database: "connected",
+      },
+
+      queue: {
+        status: "healthy",
+      },
+    });
+
+    expect(res.body.systemMetrics).toEqual(
+      expect.objectContaining({
+        totalJobs: expect.any(Number),
+        queued: expect.any(Number),
+        processing: expect.any(Number),
+        completed: expect.any(Number),
+        failed: expect.any(Number),
+      })
+    );
+
+    expect(res.body.performance).toEqual(
+      expect.objectContaining({
+        successRate: expect.any(String),
+        failureRate: expect.any(String),
+      })
+    );
+
+    expect(res.body.system).toEqual(
+      expect.objectContaining({
+        node: expect.any(String),
+        platform: expect.any(String),
+      })
+    );
+
+    expect(res.body.uptime).toEqual(expect.any(Number));
+    expect(res.body.timestamp).toEqual(expect.any(String));
+    expect(Array.isArray(res.body.endpoints)).toBe(true);
   });
 
   it("should register a normal user", async () => {
@@ -154,6 +197,4 @@ describe("API integration tests", () => {
     expect(res.status).toBe(200);
     expect(res.body.total).toBeDefined();
   });
-
-
 });
